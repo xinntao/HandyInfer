@@ -2,13 +2,13 @@ import argparse
 import cv2
 import torch
 
-from handyinfer.face_alignment import init_alignment_model, landmark_98_to_68
+from handyinfer.face_alignment import init_face_alignment_model, landmark_98_to_68
 from handyinfer.visualization import vis_face_alignment
 
 
 def main(args):
     # initialize model
-    align_net = init_alignment_model(args.model_name)
+    align_net = init_face_alignment_model(args.model_name)
 
     img = cv2.imread(args.img_path)
 
