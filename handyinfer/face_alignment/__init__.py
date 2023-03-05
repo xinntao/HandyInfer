@@ -15,7 +15,7 @@ def init_face_alignment_model(model_name, half=False, device='cuda', model_rootp
         raise NotImplementedError(f'{model_name} is not implemented.')
 
     model_path = load_file_from_url(
-        url=model_url, model_dir='weights', progress=True, file_name=None, save_dir=model_rootpath)
+        url=model_url, model_dir='handyinfer/weights', progress=True, file_name=None, save_dir=model_rootpath)
     model.load_state_dict(torch.load(model_path)['state_dict'], strict=True)
     model.eval()
     model = model.to(device)

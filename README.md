@@ -53,7 +53,7 @@ pip install handyinfer
 ### Pre-trained models
 
 It will **automatically** download pre-trained models at the first inference. <br>
-If your network is not stable, you can download in advance (may with other download tools), and put them in the folder: `PACKAGE_ROOT_PATH/weights`.
+If your network is not stable, you can download in advance (may with other download tools), and put them in the folder: `PACKAGE_ROOT_PATH/handyinfer/weights`.
 
 ## :scroll: License and Acknowledgement
 
