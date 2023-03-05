@@ -1,6 +1,7 @@
 # HandyInfer
 
 [![PyPI](https://img.shields.io/pypi/v/handyinfer)](https://pypi.org/project/handyinfer/)
+![visitors](https://visitor-badge.glitch.me/badge?page_id=xinntao/HandyInfer)
 [![download](https://img.shields.io/github/downloads/xinntao/handyinfer/total.svg)](https://github.com/xinntao/handyinfer/releases)
 <!-- [![Open issue](https://img.shields.io/github/issues/xinntao/facexlib)](https://github.com/xinntao/facexlib/issues)
 [![Closed issue](https://img.shields.io/github/issues-closed/xinntao/facexlib)](https://github.com/xinntao/facexlib/issues)
