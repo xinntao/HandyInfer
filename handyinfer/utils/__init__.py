@@ -1,3 +1,3 @@
-from .misc import img2tensor, load_file_from_url, scandir
+from .misc import img2tensor, load_file_from_url, scandir, tensor2img_fast
 
-__all__ = ['load_file_from_url', 'img2tensor', 'scandir']
+__all__ = ['load_file_from_url', 'img2tensor', 'scandir', 'tensor2img_fast']

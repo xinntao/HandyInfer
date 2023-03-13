@@ -63,3 +63,11 @@ This project is released under the MIT license. <br>
 ## :e-mail: Contact
 
 If you have any question, open an issue or email `xintao.wang@outlook.com`.
+
+---
+
+#### How to update pypi
+
+1. update `VERSION` file
+2. `python setup.py sdist bdist_wheel`
+3. `python setup.py register sdist upload`
