@@ -169,6 +169,7 @@ class TensorGrayR():
             tensor.Tensor, dtype - float32 if dtype == 'float32 or unit8: gray reverse depth map. shape (b, 1, H, W)
         """
         # Percentile can only process the first dimension
+        self.gray_r_map = self.gray_r_map.to(value.device)
         n, c, h, w = value.shape
         value = value.reshape(n, c, h * w).permute(2, 0, 1)
 
