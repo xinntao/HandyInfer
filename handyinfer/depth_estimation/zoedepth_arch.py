@@ -287,14 +287,45 @@ class AttractorLayerUnnormed(nn.Module):
         return b_new_centers, B_centers
 
 
+def percentile(input, percentiles):
+    # source code is from https://github.com/aliutkus/torchpercentile
+    """
+    Find the percentiles of a tensor along the first dimension.
+    """
+    input_dtype = input.dtype
+    input_shape = input.shape
+    if not isinstance(percentiles, torch.Tensor):
+        percentiles = torch.tensor(percentiles, dtype=torch.double)
+    if not isinstance(percentiles, torch.Tensor):
+        percentiles = torch.tensor(percentiles)
+    input = input.double()
+    percentiles = percentiles.to(input.device).double()
+    input = input.view(input.shape[0], -1)
+    in_sorted, in_argsort = torch.sort(input, dim=0)
+    positions = percentiles * (input.shape[0] - 1) / 100
+    floored = torch.floor(positions)
+    ceiled = floored + 1
+    ceiled[ceiled > input.shape[0] - 1] = input.shape[0] - 1
+    weight_ceiled = positions - floored
+    weight_floored = 1.0 - weight_ceiled
+    d0 = in_sorted[floored.long(), :] * weight_floored[:, None]
+    d1 = in_sorted[ceiled.long(), :] * weight_ceiled[:, None]
+    result = (d0 + d1).view(-1, *input_shape[1:])
+
+    return result.type(input_dtype)
+
+
 class DepthModel(nn.Module):
 
     def __init__(self):
         super().__init__()
         self.device = 'cpu'
+        self.gray_r_map = torch.linspace(1, 0, 256)
+        self.gray_r_map = self.gray_r_map.unsqueeze(dim=1).unsqueeze(dim=2).unsqueeze(dim=3)
 
     def to(self, device) -> nn.Module:
         self.device = device
+        self.gray_r_map = self.gray_r_map.to(device)
         return super().to(device)
 
     def forward(self, x, *args, **kwargs):
@@ -377,7 +408,13 @@ class DepthModel(nn.Module):
         out = (out + torch.flip(out_flip, dims=[3])) / 2
         return out
 
-    def infer(self, x, pad_input: bool = True, with_flip_aug: bool = True, **kwargs) -> torch.Tensor:
+    def infer(self,
+              x,
+              pad_input: bool = True,
+              with_flip_aug: bool = True,
+              normalize: bool = True,
+              dtype='float32',
+              **kwargs) -> torch.Tensor:
         """
         Inference interface for the model
         Args:
@@ -388,9 +425,69 @@ class DepthModel(nn.Module):
             torch.Tensor: output tensor of shape (b, 1, h, w)
         """
         if with_flip_aug:
-            return self.infer_with_flip_aug(x, pad_input=pad_input, **kwargs)
+            depth = self.infer_with_flip_aug(x, pad_input=pad_input, **kwargs)
         else:
-            return self._infer_with_pad_aug(x, pad_input=pad_input, **kwargs)
+            depth = self._infer_with_pad_aug(x, pad_input=pad_input, **kwargs)
+
+        if normalize:
+            depth = self.to_gray_r(depth, dtype=dtype)
+
+        return depth
+
+    def to_gray_r(self,
+                  value,
+                  vmin=None,
+                  vmax=None,
+                  invalid_val=-99,
+                  invalid_mask=None,
+                  background_color=128,
+                  dtype='float32'):
+        """Converts a depth map to a gray revers image.
+        Args:
+            value (torch.Tensor): Input depth map. Shape: (b, 1, H, W).
+            All singular dimensions are squeezed
+            vmin (float, optional): vmin-valued entries are mapped to start color of cmap. If None, value.min() is used.
+            Defaults to None.
+            vmax (float, optional):  vmax-valued entries are mapped to end color of cmap. If None, value.max() is used.
+            Defaults to None.
+            invalid_val (int, optional): Specifies value of invalid pixels that should be colored as 'background_color'.
+            Defaults to -99.
+            invalid_mask (numpy.ndarray, optional): Boolean mask for invalid regions. Defaults to None.
+            background_color (tuple[int], optional): 4-tuple RGB color to give to invalid pixels.
+            Defaults to (128, 128, 128).
+        Returns:
+            tensor.Tensor, dtype - float32 if dtype == 'float32 or unit8: gray reverse depth map. shape (b, 1, H, W)
+        """
+        # Percentile can only process the first dimension
+        # self.gray_r_map = self.gray_r_map.to(value.device)
+        n, c, h, w = value.shape
+        value = value.reshape(n, c, h * w).permute(2, 0, 1)
+
+        if invalid_mask is None:
+            invalid_mask = value == invalid_val
+        mask = torch.logical_not(invalid_mask)
+
+        # normaliza
+        vmin_vmax = percentile(value[mask], [2, 85])
+        vmin = vmin_vmax[0] if vmin is None else vmin
+        vmax = vmin_vmax[1] if vmax is None else vmax
+
+        value[:, vmin == vmax] = value[:, vmin == vmax] * 0.
+        value[:, vmin != vmax] = (value[:, vmin != vmax] - vmin[vmin != vmax]) / (
+            vmax[vmin != vmax] - vmin[vmin != vmax])
+
+        value[invalid_mask] = torch.nan
+
+        diff = torch.abs(self.gray_r_map - value)
+        min_ids = torch.argmin(diff, dim=0)  # [h*w, n, c]
+
+        min_ids[invalid_mask] = background_color
+        min_ids = min_ids.reshape(h, w, n, c).permute(2, 3, 0, 1)
+
+        if dtype == 'float32':
+            min_ids = min_ids.type(value.dtype) / 255.0  # [0,1]
+
+        return min_ids
 
 
 class ZoeDepth(DepthModel):

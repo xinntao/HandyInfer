@@ -5,8 +5,6 @@ import torch
 from torch.hub import download_url_to_file, get_dir
 from urllib.parse import urlparse
 
-from handyinfer.utils.percentile import Percentile
-
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -135,66 +133,3 @@ def scandir(dir_path, suffix=None, recursive=False, full_path=False):
                     continue
 
     return _scandir(dir_path, suffix=suffix, recursive=recursive)
-
-
-class TensorGrayR():
-
-    def __init__(self):
-        self.gray_r_map = torch.linspace(1, 0, 256)
-        self.gray_r_map = self.gray_r_map.unsqueeze(dim=1).unsqueeze(dim=2).unsqueeze(dim=3)
-        self.percentile = Percentile()
-
-    def to_gray_r(self,
-                  value,
-                  vmin=None,
-                  vmax=None,
-                  invalid_val=-99,
-                  invalid_mask=None,
-                  background_color=128,
-                  dtype='float32'):
-        """Converts a depth map to a gray revers image.
-        Args:
-            value (torch.Tensor): Input depth map. Shape: (b, 1, H, W).
-            All singular dimensions are squeezed
-            vmin (float, optional): vmin-valued entries are mapped to start color of cmap. If None, value.min() is used.
-            Defaults to None.
-            vmax (float, optional):  vmax-valued entries are mapped to end color of cmap. If None, value.max() is used.
-            Defaults to None.
-            invalid_val (int, optional): Specifies value of invalid pixels that should be colored as 'background_color'.
-            Defaults to -99.
-            invalid_mask (numpy.ndarray, optional): Boolean mask for invalid regions. Defaults to None.
-            background_color (tuple[int], optional): 4-tuple RGB color to give to invalid pixels.
-            Defaults to (128, 128, 128).
-        Returns:
-            tensor.Tensor, dtype - float32 if dtype == 'float32 or unit8: gray reverse depth map. shape (b, 1, H, W)
-        """
-        # Percentile can only process the first dimension
-        self.gray_r_map = self.gray_r_map.to(value.device)
-        n, c, h, w = value.shape
-        value = value.reshape(n, c, h * w).permute(2, 0, 1)
-
-        if invalid_mask is None:
-            invalid_mask = value == invalid_val
-        mask = torch.logical_not(invalid_mask)
-
-        # normaliza
-        vmin_vmax = self.percentile(value[mask], [2, 85])
-        vmin = vmin_vmax[0] if vmin is None else vmin
-        vmax = vmin_vmax[1] if vmax is None else vmax
-
-        value[:, vmin == vmax] = value[:, vmin == vmax] * 0.
-        value[:, vmin != vmax] = (value[:, vmin != vmax] - vmin[vmin != vmax]) / (
-            vmax[vmin != vmax] - vmin[vmin != vmax])
-
-        value[invalid_mask] = torch.nan
-
-        diff = torch.abs(self.gray_r_map - value)
-        min_ids = torch.argmin(diff, dim=0)  # [h*w, n, c]
-
-        min_ids[invalid_mask] = background_color
-        min_ids = min_ids.reshape(h, w, n, c).permute(2, 3, 0, 1)
-
-        if dtype == 'float32':
-            min_ids = min_ids.type(value.dtype) / 255.0  # [0,1]
-
-        return min_ids

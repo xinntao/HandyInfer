@@ -3,8 +3,7 @@ import cv2
 import torch
 
 from handyinfer.depth_estimation import init_depth_estimation_model
-from handyinfer.utils import img2tensor
-from handyinfer.visualization import vis_depth_estimation
+from handyinfer.utils import img2tensor, tensor2img_fast
 
 
 def main(args):
@@ -17,10 +16,10 @@ def main(args):
 
     with torch.no_grad():
         pred = depth_net.infer(img)
-        pred = vis_depth_estimation(pred)
 
     # save img
     if args.save_path is not None:
+        pred = tensor2img_fast(pred)
         cv2.imwrite(args.save_path, pred)
 
 
